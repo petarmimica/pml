@@ -100,7 +100,7 @@ E  | 0   | 1  | 1 |  1 | 353
 
 # Predicting The Testing Data
 
-As discussed above, the best method is random forest. The following coad loads the best model and predicts the testing data:
+As discussed above, the best method is random forest. The following code loads the best model and predicts the testing data:
 ```{r, eval=FALSE}
 # predict testing data
 
@@ -115,8 +115,13 @@ print(finaltestPred)
 After submitting to the Coursera website, I got 18 points out of 20. This is consistent with the 90% accuracy rate when validating the method.
 ![Attempt 1][attempt1]
 
-Unfortunately, I was mistaken in thinking I could submit a second solution afterward. Rather, the two solutions should have been submitted simultaneously. Nevertheless, in the second attempt I trained on 19000 points and got different predictions exactly on the two datasets that were wrong in my first attempt (the rest of the predictions were identical). This means that, with the full dataset, I could probably have obtained 20 points out of 20.
+Unfortunately, I was mistaken in thinking I could submit a second solution afterward. Rather, the two solutions should have been submitted simultaneously. Nevertheless, in the second attempt I trained on 19000 points and got different predictions exactly on the two datasets that were wrong in my first attempt (the rest of the predictions were identical). This means that, with the full dataset, I could probably have obtained 20 points out of 20. The source code for the second attempt can be found [here][att2].
+
+# Summary
+
+Four methods have been considered for fitting the training data: CART, bagged CART, random forest and boosting. 2000 out of 19000+ entries in the dataset have been used. The random forest was chosen as the one with the lowest out-of-sample error. It was applied to the testing data and 18 points out of 20 were obtained. However, even better accuracy could have been obtained if more entries from the training dataset would have been used. They were not used from the start due to a long execution time when performing a large number of folds and using all four methods. Nevertheless, the final 90% accuracy is probably an acceptable result.
 
 [vellosoetal]: http://groupware.les.inf.puc-rio.br/har
 [project.R]: http://petarmimica.github.io/pml/project.R "project.R"
 [attempt1]: http://petarmimica.github.io/pml/attempt1.png "attempt1.png"
+[att2]: http://petarmimica.github.io/pml/attempt2.R "attempt2.R"
