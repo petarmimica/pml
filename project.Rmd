@@ -1,0 +1,122 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Petar Mimica"
+date: "22 Aug 2014"
+output: html_document
+---
+
+# Introduction
+
+This is the report on the course project for the course "Practical Machine Learning". The code which performs all calculations can be found [here][project.R].
+
+# Preparatory Work
+
+I initialize the libraries and read the datasets from the input file. The datasets I use are from the following [paper][vellosoetal]: Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. *Qualitative Activity Recognition of Weight Lifting Exercises*. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+```{r, eval=FALSE}
+library(caret);library(ggplot2);
+trainread <- read.csv("pml-training.csv", na.strings=c("NA", "#DIV/0!"))
+testread <- read.csv("pml-testing.csv", na.strings=c("NA", "#DIV/0!"))
+```
+Note: I added the string "#DIV/0!" to the list of strings assumed to represent missing values.
+
+I examined the names of the variables and concluded that the first seven are probably metadata (timestamps, user names, etc.). Next I find the subset of the complete variables in the testing dataset, and will use that subset on the training dataset.
+```{r, eval=FALSE}
+testtmp <- testread[,8:160] # restrict to variables 8:160
+allmissing = lapply(lapply(testtmp[, ], is.na), sum) # get missing entries for all vars
+selGood <- (as.numeric(allmissing))==0 # select those vars with no missing entries whatsoever
+```
+Now I restrict the training dataset using the selGood array computed above:
+```{r, eval=FALSE}
+traintotaltmp <- trainread[,8:160] # restrict to variables 8:160 
+traintotal <- traintotaltmp[,selGood] # further restricto to those vars not missing in testing dataset
+```
+
+# Testing Different Algorithms
+
+The next step is to decide which algorithm to use. I use CART, bagged CART, random forest and boosting methods. Since the training dataset is quite large (more than 19000 entries), I decided to select a reduced (and hopefully representative) dataset of 2000 entries for training and testing and keep another 2000 for validation.
+```{r, eval=FALSE}
+set.seed(543534)
+numdata <- 2000
+numvalid <- 2000
+
+# create selection of (numdata + numvalid) entries from the total training data
+outTotalSelection <- createDataPartition(traintotal$classe, p = 1 - (numdata+numvalid)/nrow(traintotal), list=FALSE)
+totalselection <- traintotal[-outTotalSelection,]
+
+# split the training/testing and validation datasets
+inSelection <- createDataPartition(totalselection$classe, p=numdata / (numdata + numvalid), list=FALSE)
+selection <- totalselection[inSelection,]
+validation <- totalselection[-inSelection,]
+```
+Now the variable selection contains the actual training and testing data. In order to cross-validate each method, I create 10 folds:
+```{r, eval=FALSE}
+numfolds <- 10
+foldSel <- createFolds(y = selection$classe, k = numfolds, returnTrain = TRUE)
+```
+The variable foldSel contains the selection for the training dataset. In each iteration I split into training and testing datasets as follows:
+```{r, eval=FALSE}
+# i is the loop counter which goes from 1 to numFolds
+training <- selection[foldSel[[i]],]
+testing <- selection[-foldSel[[i]],]
+```
+Now I do the training for each method. For example, using CART method I write:
+```{r, eval=FALSE}
+tmpfit <- train(classe ~ ., method="rpart", data = training)
+```
+Then I predict the testing data and store the average accuracy into a global data frame which is used for averaging over all folds afterward:
+```{r, eval=FALSE}
+# predict
+testPred <- predict(tmpfit, newdata = testing)    
+
+# store the mean number of correct predictions into a global data frame
+testacclist$cart[i] <- mean(testPred == testing$classe)
+```
+The models are stored on the disk so that they can be reused later if needed. After performing 10 folds I compute the mean and the standard deviation for each method. In addition, for each method I select the model which has the highest accuracy on the testing dataset (within that fold) and use it to predict the validation dataset. I store the mean accuracy in a global data frame. The results of the final comparison of the four method can be seen in the table below:
+
+methods | mean of test acc. |  s.d. of test acc | mean of valid. acc.
+------|------------|------------|-----------
+CART | 0.5392064 |0.04762931   |0.6249374
+bagged CART | 0.9275555 |0.02546200   |0.9369054
+random forest | 0.9395133 |0.01944828   |0.9529294
+boost | 0.9325133 |0.01660339   |0.9263896
+
+My conclusion is that the methods are *well cross-validated*, since the standard deviation of the accuracy on the test data is less than 10% of the mean, and also because the accuracy on the validation data (which has not been used for training nor testing) is only slightly smaller than the accuracy on the testing data. This means that the **out-of-sample error** is probably small. 
+
+**Random forest method** is slightly better than boost and bagged CART, and much better than CART. For the final prediction I will use the random forest method's model which had highers test accuracy on testing data. Here is the confusion matrix showing how well it predicts the validation data:
+```{r, eval=FALSE}
+validPred <- predict(tmpfit, newdata=validation) 
+confusionMatrix(table(validPred, validation$classe))
+```
+The confusion matrix looks as follows:  
+
+validPred | A | B | C | D | E
+------|------------|------------|-----------|--------|-------
+A | 561  | 19 |  0 |  1 |  0
+B  | 4 | 361 | 25 |  2 |  7
+C  | 3 |  5 | 318 | 13 |  3
+D  | 0  | 1  | 4 | 310 |  4  
+E  | 0   | 1  | 1 |  1 | 353 
+
+# Predicting The Testing Data
+
+As discussed above, the best method is random forest. The following coad loads the best model and predicts the testing data:
+```{r, eval=FALSE}
+# predict testing data
+
+# best model: rf, 1st fold
+outname=paste(nameid,"rf",1,"Rdata",sep=".")
+load(outname)
+
+finaltestPred <- predict(tmpfit, newdata=testtotal)
+print(finaltestPred)
+```
+
+After submitting to the Coursera website, I got 18 points out of 20. This is consistent with the 90% accuracy rate when validating the method.
+![Attempt 1][attempt1]
+
+Unfortunately, I was mistaken in thinking I could submit a second solution afterward. Rather, the two solutions should have been submitted simultaneously. Nevertheless, in the second attempt I trained on 19000 points and got different predictions exactly on the two datasets that were wrong in my first attempt (the rest of the predictions were identical). This means that, with the full dataset, I could probably have obtained 20 points out of 20.
+
+[vellosoetal]: http://groupware.les.inf.puc-rio.br/har
+[project.R]: http://petarmimica.github.io/pml/project.R "project.R"
+[attempt1]: http://petarmimica.github.io/pml/attempt1.png "attempt1.png"
