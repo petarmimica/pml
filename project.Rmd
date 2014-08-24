@@ -1,6 +1,5 @@
 ---
 title: "Practical Machine Learning Course Project"
-author: "Petar Mimica"
 date: "22 Aug 2014"
 output: html_document
 ---
